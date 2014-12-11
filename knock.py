@@ -6,6 +6,8 @@ import struct
 import time
 
 TTL = 10
+SOCKETS = 3
+START_PORT = 8080
 
 #class KnockHandler(asyncore.dispatcher_with_send):
 #
@@ -103,7 +105,7 @@ class KnockServer(asyncore.dispatcher):
 
 if __name__ == '__main__':
     db = DictDB()
-    server = KnockServer('localhost', 8080, db)
-    server = KnockServer('localhost', 8081, db)
-    server = KnockServer('localhost', 8082, db)
+    for i in xrange(SOCKETS):
+        KnockServer('localhost', (START_PORT + i), db)
+
     asyncore.loop()
