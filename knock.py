@@ -5,6 +5,13 @@ import socket
 import struct
 import time
 
+# DEBUG Start
+DEBUG = True
+def log(text):
+    if DEBUG:
+        print "DEBUG: " + str(text)
+# DEBUG End.
+
 TTL = 10
 SOCKETS = 3
 START_PORT = 8080
@@ -27,7 +34,7 @@ class DictDB():
 
 
     def write_hit(self, int_ip, port):
-        print "write_hit: Connection from %d on port %d" % (int_ip, port)
+        log("write_hit: Connection from %d on port %d" % (int_ip, port))
 
         try:
             db_user = self.db[int_ip]
@@ -35,7 +42,7 @@ class DictDB():
                 # Grant access, increase state
                 if(db_user['state'] == 1):
                     # Access granted. TODO: Alter the iptables rules.
-                    print "Access granted! Hooray!"
+                    log("Access granted! Hooray!")
                     del self.db[int_ip]
                 else:
                     db_user['state'] += 1
@@ -86,18 +93,20 @@ class KnockServer(asyncore.dispatcher):
         self.set_reuse_addr()
         self.bind(('', port))
         self.listen(5)
+        log("Knock Socket initialized on port " + str(port))
 
     def handle_accept(self):
         pair = self.accept()
         if pair is not None:
             sock, addr = pair
-            print 'Incoming connection from %s to %s' % (repr(addr), repr(sock.getsockname()))
+            log('Incoming connection from %s to %s' % (repr(addr), repr(sock.getsockname())))
             Knock(sock, self.db, addr[0])
-            print self.db
+            log(self.db)
             try:
-                sock.send('Thank you for connecting\n')
-            except socket.error:    # Handle the knocking.
-                pass
+                sock.send('Thank you for knocking\n')
+            except socket.error:
+                # Handle the pure knocking.
+                log('Expected broken pipe')
 
             sock.close()
             #handler = KnockHandler(sock)
