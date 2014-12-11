@@ -16,12 +16,6 @@ TTL = 10
 SOCKETS = 3
 START_PORT = 8080
 
-#class KnockHandler(asyncore.dispatcher_with_send):
-#
-#    def handle_read(self):
-#        data = self.recv(8192)
-#        if data:
-#            self.send(data)
 
 class DictDB():
 
