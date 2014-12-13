@@ -4,9 +4,12 @@ import asyncore
 import socket
 import struct
 import time
+from subprocess import Popen, PIPE
 
 # DEBUG Start
 DEBUG = True
+
+
 def log(text):
     if DEBUG:
         print "DEBUG: " + str(text)
@@ -22,22 +25,21 @@ class DictDB():
     def __str__(self):
         return str(self.db)
 
-
     def __init__(self):
         self.db = {}
 
-
     def write_hit(self, int_ip, port):
-        log("write_hit: Connection from %d on port %d" % (int_ip, port))
-
+        self.clean_db()
         try:
             db_user = self.db[int_ip]
-            if(db_user['last_port'] < port and (db_user['time'] + TTL) > int(time.time())):
+            time_cond = (db_user['time'] + TTL) > int(time.time())
+            if(db_user['last_port'] < port and time_cond):
                 # Grant access, increase state
                 if(db_user['state'] == 1):
                     # Access granted. TODO: Alter the iptables rules.
                     log("Access granted! Hooray!")
                     del self.db[int_ip]
+                    return True
                 else:
                     db_user['state'] += 1
                     db_user['time'] = int(time.time())
@@ -48,8 +50,12 @@ class DictDB():
 
         except KeyError:
             # Unknown user, initialize the db
-            self.db[int_ip] = {'state': 0, 'time': int(time.time()), 'last_port': port}
-
+            self.db[int_ip] = {
+                'state': 0,
+                'time': int(time.time()),
+                'last_port': port
+            }
+        return False
 
     def clean_db(self):
         pass
@@ -63,18 +69,39 @@ class Knock():
         self.ip = client_ip
         self.handle_hit()
 
-
     def handle_hit(self):
         int_ip = self.ip2long(self.ip)
         port = self.sock.getsockname()[1]
-        self.db.write_hit(int_ip, port)
-
+        granted = self.db.write_hit(int_ip, port)
+        if(granted):
+            self.alter_firewall(self.ip)
 
     def ip2long(self, ip):
         return struct.unpack("!L", socket.inet_aton(ip))[0]
 
     def long2ip(self, int_ip):
         return socket.inet_ntoa(struct.pack('!L', int_ip))
+
+    def alter_firewall(self, ip):
+        rule_enable = [
+            'iptables',
+            '-I', 'INPUT',
+            '-m', 'state',
+            '--state', 'NEW',
+            '-p', 'tcp',
+            '-s', ip,
+            '--dport', '22',
+            '-j', 'ACCEPT'
+        ]
+        enable = Popen(rule_enable)
+
+        rule_disable = rule_enable[:]
+        rule_disable[1] = '-D'
+        rule_disable_str = " ".join(rule_disable)
+        disable = Popen(["at", "now", "+", "1", "minute"], stdin=PIPE)
+        disable.communicate(rule_disable_str)
+
+        return (enable.wait() and disable.wait())
 
 
 class KnockServer(asyncore.dispatcher):
@@ -93,7 +120,7 @@ class KnockServer(asyncore.dispatcher):
         pair = self.accept()
         if pair is not None:
             sock, addr = pair
-            log('Incoming connection from %s to %s' % (repr(addr), repr(sock.getsockname())))
+            log('Incoming conn. from %s to %s' % (addr, sock.getsockname()))
             Knock(sock, self.db, addr[0])
             log(self.db)
             try:
@@ -103,8 +130,7 @@ class KnockServer(asyncore.dispatcher):
                 log('Expected broken pipe')
 
             sock.close()
-            #handler = KnockHandler(sock)
-
+            # handler = KnockHandler(sock)
 
 if __name__ == '__main__':
     db = DictDB()
