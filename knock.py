@@ -72,8 +72,7 @@ class Knock():
     def handle_hit(self):
         int_ip = self.ip2long(self.ip)
         port = self.sock.getsockname()[1]
-        granted = self.db.write_hit(int_ip, port)
-        if(granted):
+        if(self.db.write_hit(int_ip, port)):
             self.alter_firewall(self.ip)
 
     def ip2long(self, ip):
