@@ -21,14 +21,22 @@ START_PORT = 8080
 
 
 class DictDB():
-
+    """Dictionary class by using a dictionary.
+    """
     def __str__(self):
         return str(self.db)
 
     def __init__(self):
+        """DB initializer. Creates empty dict.
+        """
         self.db = {}
 
     def write_hit(self, int_ip, port):
+        """Write the hit in the dictionary database
+
+        :param int_ip: The real, integer, value of the IP address.
+        :param port: The port address of the chosen socket.
+        """
         self.clean_db()
         try:
             db_user = self.db[int_ip]
@@ -36,7 +44,6 @@ class DictDB():
             if(db_user['last_port'] < port and time_cond):
                 # Grant access, increase state
                 if(db_user['state'] == 1):
-                    # Access granted. TODO: Alter the iptables rules.
                     log("Access granted! Hooray!")
                     del self.db[int_ip]
                     return True
@@ -58,30 +65,58 @@ class DictDB():
         return False
 
     def clean_db(self):
+        """This method should clean the database from old, already unuseful data.
+        """
         pass
 
 
 class Knock():
-
+    """The objects of this class will handle the Knock action.
+    """
     def __init__(self, sock, db, client_ip):
+        """The object initializer. It will do all it's job from here.
+
+        :param sock: The socket object.
+        :param db: The database object.
+        :param client_ip: The ip address of the client.
+        """
         self.sock = sock
         self.db = db
         self.ip = client_ip
         self.handle_hit()
 
     def handle_hit(self):
+        """This method will handle the hit,
+        and if it is granted - will alter the firewall rules.
+        """
         int_ip = self.ip2long(self.ip)
         port = self.sock.getsockname()[1]
         if(self.db.write_hit(int_ip, port)):
             self.alter_firewall(self.ip)
 
     def ip2long(self, ip):
+        """This method will convert the str ip to the real integer value.
+
+        :param ip: String representation of the ip.
+        :return: Integer representation of the ip address.
+        """
         return struct.unpack("!L", socket.inet_aton(ip))[0]
 
     def long2ip(self, int_ip):
+        """This method will convert the integer ip back to string.
+
+        :param int_ip: Integer ip.
+        :return: String ip address.
+        """
         return socket.inet_ntoa(struct.pack('!L', int_ip))
 
     def alter_firewall(self, ip):
+        """This method will alter the firewall rules
+        and it will schedule the new rule removal after 1 minute.
+
+        :param ip: The client ip address.
+        :return: True if anything went correct.
+        """
         rule_enable = [
             'iptables',
             '-I', 'INPUT',
@@ -104,8 +139,15 @@ class Knock():
 
 
 class KnockServer(asyncore.dispatcher):
-
+    """The sockets will be initialized and handled by this class.
+    """
     def __init__(self, host, port, db):
+        """Class initializer. Creates the socket with given host, port, db object.
+
+        :param host: Host for listening.
+        :param port: Port of the socket.
+        :param db: DictDB object.
+        """
         asyncore.dispatcher.__init__(self)
         self.db = db
 
@@ -116,6 +158,8 @@ class KnockServer(asyncore.dispatcher):
         log("Knock Socket initialized on port " + str(port))
 
     def handle_accept(self):
+        """Predefined method that will handle the accepted connection.
+        """
         pair = self.accept()
         if pair is not None:
             sock, addr = pair
